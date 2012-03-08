@@ -31,9 +31,11 @@ import javax.persistence.EntityManager;
 import javax.persistence.Query;
 import javax.validation.*;
 import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -97,12 +99,26 @@ public class MemberService {
    }
 
    @GET
-   @Path("/{id:[0-9][0-9]*}/json")
+   @Path("/json/{id:[0-9][0-9]*}")
    @Produces(MediaType.APPLICATION_JSON)
    public Member lookupMemberByIdJSON(@PathParam("id") long id) {
       return em.find(Member.class, id);
    }
-   
+
+   @POST
+   @Path("/json")
+   @Consumes(MediaType.APPLICATION_JSON)
+   @Produces(MediaType.APPLICATION_JSON)
+   public Response createMemberJSON(Member member) {
+       // this resource only creates new members. Incoming entity must not have an ID
+       if (member.getId() != null) {
+           Map<String, Object> responseObj = new HashMap<String, Object>();
+           responseObj.put("id", "Cannot create a new member if id is already specified");
+           return Response.status(Response.Status.BAD_REQUEST).entity(responseObj).build();
+       }
+       return createNewMember(member);
+   }
+
    @GET
    @Path("/new")
    @Produces(MediaType.APPLICATION_JSON)
@@ -120,6 +136,34 @@ public class MemberService {
                                     @FormParam("phoneNumber") String phone) {
       return createNewMember(name, email, phone);
    }
+
+
+    @PUT
+    @Path("/json/{id:[0-9][0-9]*}")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response updateMemberJSON(Member member, @PathParam("id") long id) {
+        if (member.getId() == null) {
+            // allow for requests with no member id?
+            member.setId(id);
+        } else if (member.getId() != id) {
+            Map<String, Object> responseObj = new HashMap<String, Object>();
+            responseObj.put("id", "Member id from request inconsistent with URL");
+            return Response.status(Response.Status.BAD_REQUEST).entity(responseObj).build(); 
+        }
+        return updateMember(member);
+    }
+
+    @DELETE
+    @Path("/json/{id:[0-9][0-9]*}")
+    public Response deleteMember(@PathParam("id") long id) {
+        Member member = em.find(Member.class, id);
+        if (member == null) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        }
+        em.remove(member);
+        return Response.ok().build();
+    }
    
    /**
     * Creates a new member from the values provided.  Performs validation, and will return a JAX-RS response with either
@@ -134,33 +178,55 @@ public class MemberService {
        member.setEmail(email);
        member.setPhoneNumber(phone);
 
-       try {
-          //Validates member using bean validation
-          validateMember(member);
-
-          //Register the member
-          log.info("Registering " + member.getName());
-          em.persist(member);
-
-          //Trigger the creation event
-          memberEventSrc.fire(member);
-
-          //Create an "ok" response
-          builder = Response.ok();
-       } catch (ConstraintViolationException ce) {
-          //Handle bean validation issues
-          builder = createViolationResponse(ce.getConstraintViolations());
-       } catch (ValidationException e) {
-          //Handle the unique constrain violation
-          Map<String, String> responseObj = new HashMap<String, String>();
-          responseObj.put("email","Email taken");
-          builder = Response.status(Response.Status.CONFLICT).entity(responseObj);
-       }
-
-       return builder.build();
+       return createNewMember(member);
     }
 
-   /**
+    /**
+     * Creates a new member from the instance provided.  Performs validation, and will return a JAX-RS response with either
+     * 200 ok, or with a map of fields, and related errors.
+     */
+    private Response createNewMember(Member member) {
+        Response.ResponseBuilder builder;
+        try {
+           //Validates member using bean validation
+           validateNewMember(member);
+
+           //Register the member
+           log.info("Registering " + member.getName());
+           em.persist(member);
+
+           //Trigger the creation event
+           memberEventSrc.fire(member);
+
+           //Create an "ok" response
+           builder = Response.ok();
+        } catch (ConstraintViolationException ce) {
+           //Handle bean validation issues
+           builder = createViolationResponse(ce.getConstraintViolations());
+        } catch (ValidationException e) {
+           //Handle the unique constrain violation
+           Map<String, String> responseObj = new HashMap<String, String>();
+           responseObj.put("email","Email taken");
+           builder = Response.status(Response.Status.CONFLICT).entity(responseObj);
+        }
+        return builder.build();
+    }
+
+    private Response updateMember(Member member) {
+        Set<ConstraintViolation<?>> constraintViolations = (Set<ConstraintViolation<?>>) validator.validate(member);
+        if (!constraintViolations.isEmpty()) {
+            return createViolationResponse(constraintViolations).build();
+        }
+        // look up that the instance exists, so we can return the appropriate error code if it doesn't
+        Member existingInstance = em.find(Member.class, member.getId());
+        if (existingInstance == null) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        }
+        em.merge(member);
+        return Response.ok().build();
+    }
+
+    /**
     * <p>Validates the given Member variable and throws validation exceptions based on the type of error.
     * If the error is standard bean validation errors then it will throw a ConstraintValidationException
     * with the set of the constraints violated.</p>
@@ -170,7 +236,7 @@ public class MemberService {
     * @throws ConstraintViolationException If Bean Validation errors exist
     * @throws ValidationException If member with the same email already exists
     */
-   private void validateMember(Member member) throws ConstraintViolationException, ValidationException{
+   private void validateNewMember(Member member) throws ConstraintViolationException, ValidationException{
       //Create a bean validator and check for issues.
       Set<ConstraintViolation<Member>> violations = validator.validate(member);
 
