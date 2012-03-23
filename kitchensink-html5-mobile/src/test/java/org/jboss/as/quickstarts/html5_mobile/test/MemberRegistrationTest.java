@@ -27,6 +27,9 @@ import javax.ws.rs.core.Response;
 
 import org.jboss.arquillian.container.test.api.Deployment;
 import org.jboss.arquillian.junit.Arquillian;
+import org.jboss.as.quickstarts.html5_mobile.model.Address;
+import org.jboss.as.quickstarts.html5_mobile.model.Country;
+import org.jboss.as.quickstarts.html5_mobile.rest.JaxRsActivator;
 import org.jboss.shrinkwrap.api.Archive;
 import org.jboss.shrinkwrap.api.ShrinkWrap;
 import org.jboss.shrinkwrap.api.asset.EmptyAsset;
@@ -48,7 +51,9 @@ public class MemberRegistrationTest {
    @Deployment
    public static Archive<?> createTestArchive() {
       return ShrinkWrap.create(WebArchive.class, "test.war")
-            .addClasses(Member.class, MemberService.class, Resources.class)
+            .addPackage(Member.class.getPackage())
+            .addPackage(JaxRsActivator.class.getPackage())
+            .addPackage(Resources.class.getPackage())
             .addAsResource("META-INF/persistence.xml", "META-INF/persistence.xml")      
             .addAsWebInfResource(EmptyAsset.INSTANCE, "beans.xml");
    }
@@ -61,7 +66,7 @@ public class MemberRegistrationTest {
 
    @Test
    public void testRegister() throws Exception {
-      Response response = memberRegistration.createNewMember("Jane Doe", "jane@mailinator.com", "2125551234");
+      Response response = memberRegistration.createNewMember("Jane Doe", "jane@mailinator.com", "2125551234", new Address());
 
       assertEquals("Unexpected response status", 200, response.getStatus());
       log.info(" New member was persisted and returned status " + response.getStatus());
@@ -70,7 +75,7 @@ public class MemberRegistrationTest {
    @SuppressWarnings("unchecked")
    @Test
    public void testInvalidRegister() throws Exception {
-      Response response = memberRegistration.createNewMember("", "", "");
+      Response response = memberRegistration.createNewMember("", "", "", new Address());
 
       assertEquals("Unexpected response status", 400, response.getStatus());
       assertNotNull("response.getEntity() should not null",response.getEntity());
@@ -83,10 +88,10 @@ public class MemberRegistrationTest {
    @Test
    public void testDuplicateEmail() throws Exception {
       //Register an initial user
-      memberRegistration.createNewMember("Jane Doe", "jane@mailinator.com", "2125551234");
+      memberRegistration.createNewMember("Jane Doe", "jane@mailinator.com", "2125551234", new Address());
 
       //Register a different user with the same email
-      Response response = memberRegistration.createNewMember("John Doe", "jane@mailinator.com", "2133551234");
+      Response response = memberRegistration.createNewMember("John Doe", "jane@mailinator.com", "2133551234", new Address());
 
       assertEquals("Unexpected response status", 409, response.getStatus());
       assertNotNull("response.getEntity() should not null",response.getEntity());

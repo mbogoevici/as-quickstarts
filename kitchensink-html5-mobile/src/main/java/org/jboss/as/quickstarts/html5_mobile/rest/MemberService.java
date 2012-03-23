@@ -43,6 +43,8 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import org.jboss.as.quickstarts.html5_mobile.model.Address;
+import org.jboss.as.quickstarts.html5_mobile.model.Country;
 import org.jboss.as.quickstarts.html5_mobile.model.Member;
 
 /**
@@ -66,9 +68,160 @@ public class MemberService {
    @Inject
    private Validator validator;
 
+   // List getters - these methods retrieve a list of members in various formats
+
    @GET
-   @Produces("text/xml")
+   @Produces(MediaType.APPLICATION_XML)
    public List<Member> listAllMembers() {
+      return getAllMembers();
+   }
+
+   @GET
+   @Path("/json")
+   @Produces(MediaType.APPLICATION_JSON)
+   public List<Member> listAllMembersJSON() {
+      return getAllMembers();
+   }
+
+   // Individual item getter
+
+   @GET
+   @Path("/{id:[0-9][0-9]*}")
+   @Produces("text/xml")
+   public Member lookupMemberById(@PathParam("id") long id) {
+      return getMemberById(id);
+   }
+
+   @GET
+   @Path("/json/{id:[0-9][0-9]*}")
+   @Produces(MediaType.APPLICATION_JSON)
+   public Member lookupMemberByIdJSON(@PathParam("id") long id) {
+      return getMemberById(id);
+   }
+
+   // Create
+
+   @POST
+   @Path("/json")
+   @Consumes(MediaType.APPLICATION_JSON)
+   @Produces(MediaType.APPLICATION_JSON)
+   public Response createMemberJSON(Member member) {
+      // this resource only creates new members. Incoming entity must not have an ID
+      if (member.getId() != null) {
+         Map<String, Object> responseObj = new HashMap<String, Object>();
+         responseObj.put("id", "Cannot create a new member if id is already specified");
+         return Response.status(Response.Status.BAD_REQUEST).entity(responseObj).build();
+      }
+      return createNewMember(member);
+   }
+
+   @GET
+   @Path("/new")
+   @Produces(MediaType.APPLICATION_JSON)
+   public Response createMemberGet(@QueryParam("name") String name,
+                                   @QueryParam("email") String email,
+                                   @QueryParam("phoneNumber") String phone,
+                                   @QueryParam("country") long country,
+                                   @QueryParam("city") String city,
+                                   @QueryParam("address1") String address1,
+                                   @QueryParam("address2") String address2,
+                                   @QueryParam("region") String region,
+                                   @QueryParam("postalCode") String postalCode) {
+      Address address = new Address();
+      address.setAddress1(address1);
+      address.setAddress2(address2);
+      address.setCity(city);
+      address.setCountry(em.find(Country.class, country));
+      address.setPostalCode(postalCode);
+      address.setRegion(region);
+      return createNewMember(name, email, phone, address);
+   }
+
+   @POST
+   @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+   @Produces(MediaType.APPLICATION_JSON)
+   public Response createMemberPost(@FormParam("name") String name,
+                                    @FormParam("email") String email,
+                                    @FormParam("phoneNumber") String phone,
+                                    @FormParam("country") long country,
+                                    @FormParam("city") String city,
+                                    @FormParam("address1") String address1,
+                                    @FormParam("address2") String address2,
+                                    @FormParam("region") String region,
+                                    @FormParam("postalCode") String postalCode) {
+      Address address = new Address();
+      address.setAddress1(address1);
+      address.setAddress2(address2);
+      address.setCity(city);
+      address.setCountry(em.find(Country.class, country));
+      address.setPostalCode(postalCode);
+      address.setRegion(region);
+      return createNewMember(name, email, phone, address);
+   }
+
+   // Update
+
+   @PUT
+   @Path("/json/{id:[0-9][0-9]*}")
+   @Consumes(MediaType.APPLICATION_JSON)
+   @Produces(MediaType.APPLICATION_JSON)
+   public Response updateMemberJSON(Member member, @PathParam("id") long id) {
+      if (member.getId() == null) {
+         // allow for requests with no member id?
+         member.setId(id);
+      } else if (member.getId() != id) {
+         Map<String, Object> responseObj = new HashMap<String, Object>();
+         responseObj.put("id", "Member id from request inconsistent with URL");
+         return Response.status(Response.Status.BAD_REQUEST).entity(responseObj).build();
+      }
+      return updateMember(member);
+   }
+
+   @POST
+   @Path("/{id:[0-9][0-9]*}")
+   @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+   @Produces(MediaType.APPLICATION_JSON)
+   public Response updateMemberForm(@PathParam("id") long id,
+                                    @FormParam("name") String name,
+                                    @FormParam("email") String email,
+                                    @FormParam("phoneNumber") String phone,
+                                    @FormParam("country") long country,
+                                    @FormParam("city") String city,
+                                    @FormParam("address1") String address1,
+                                    @FormParam("address2") String address2,
+                                    @FormParam("region") String region,
+                                    @FormParam("postalCode") String postalCode) {
+      Member member = new Member();
+      member.setEmail(email);
+      member.setId(id);
+      member.setName(name);
+      member.setPhoneNumber(phone);
+      Address address = new Address();
+      address.setAddress1(address1);
+      address.setAddress2(address2);
+      address.setCity(city);
+      address.setCountry(em.find(Country.class, country));
+      address.setPostalCode(postalCode);
+      address.setRegion(region);
+      member.setAddress(address);
+      return updateMember(member);
+   }
+
+   // Delete
+
+   @DELETE
+   @Path("/json/{id:[0-9][0-9]*}")
+   public Response deleteMember(@PathParam("id") long id) {
+      Member member = getMemberById(id);
+      if (member == null) {
+         return Response.status(Response.Status.NOT_FOUND).build();
+      }
+      em.remove(member);
+      return Response.ok().build();
+   }
+
+
+   private List<Member> getAllMembers() {
       // Use @SupressWarnings to force IDE to ignore warnings about "genericizing" the results of
       // this query
       @SuppressWarnings("unchecked")
@@ -81,162 +234,84 @@ public class MemberService {
       return results;
    }
 
-   @GET
-   @Path("/json")
-   @Produces(MediaType.APPLICATION_JSON)
-   public List<Member> listAllMembersJSON() {
-      @SuppressWarnings("unchecked")
-
-      final List<Member> results = em.createQuery("select m from Member m order by m.name").getResultList();
-      return results;
-   }
-
-   @GET
-   @Path("/{id:[0-9][0-9]*}")
-   @Produces("text/xml")
-   public Member lookupMemberById(@PathParam("id") long id) {
+   private Member getMemberById(long id) {
       return em.find(Member.class, id);
    }
 
-   @GET
-   @Path("/json/{id:[0-9][0-9]*}")
-   @Produces(MediaType.APPLICATION_JSON)
-   public Member lookupMemberByIdJSON(@PathParam("id") long id) {
-      return em.find(Member.class, id);
-   }
 
-   @POST
-   @Path("/json")
-   @Consumes(MediaType.APPLICATION_JSON)
-   @Produces(MediaType.APPLICATION_JSON)
-   public Response createMemberJSON(Member member) {
-       // this resource only creates new members. Incoming entity must not have an ID
-       if (member.getId() != null) {
-           Map<String, Object> responseObj = new HashMap<String, Object>();
-           responseObj.put("id", "Cannot create a new member if id is already specified");
-           return Response.status(Response.Status.BAD_REQUEST).entity(responseObj).build();
-       }
-       return createNewMember(member);
-   }
-
-   @GET
-   @Path("/new")
-   @Produces(MediaType.APPLICATION_JSON)
-   public Response createMemberGet(@QueryParam("name") String name, 
-                                   @QueryParam("email") String email, 
-                                   @QueryParam("phoneNumber") String phone) {
-       return createNewMember(name, email, phone);
-   }
-
-   @POST
-   @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
-   @Produces(MediaType.APPLICATION_JSON)
-   public Response createMemberPost(@FormParam("name") String name, 
-                                    @FormParam("email") String email, 
-                                    @FormParam("phoneNumber") String phone) {
-      return createNewMember(name, email, phone);
-   }
-
-
-    @PUT
-    @Path("/json/{id:[0-9][0-9]*}")
-    @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON)
-    public Response updateMemberJSON(Member member, @PathParam("id") long id) {
-        if (member.getId() == null) {
-            // allow for requests with no member id?
-            member.setId(id);
-        } else if (member.getId() != id) {
-            Map<String, Object> responseObj = new HashMap<String, Object>();
-            responseObj.put("id", "Member id from request inconsistent with URL");
-            return Response.status(Response.Status.BAD_REQUEST).entity(responseObj).build(); 
-        }
-        return updateMember(member);
-    }
-
-    @DELETE
-    @Path("/json/{id:[0-9][0-9]*}")
-    public Response deleteMember(@PathParam("id") long id) {
-        Member member = em.find(Member.class, id);
-        if (member == null) {
-            return Response.status(Response.Status.NOT_FOUND).build();
-        }
-        em.remove(member);
-        return Response.ok().build();
-    }
-   
    /**
     * Creates a new member from the values provided.  Performs validation, and will return a JAX-RS response with either
     * 200 ok, or with a map of fields, and related errors.
     */
-   public Response createNewMember(String name, String email, String phone) {
-       Response.ResponseBuilder builder = null;
+   public Response createNewMember(String name, String email, String phone, Address address) {
+      Response.ResponseBuilder builder = null;
 
-       //Create a new member class from fields
-       Member member = new Member();
-       member.setName(name);
-       member.setEmail(email);
-       member.setPhoneNumber(phone);
+      //Create a new member class from fields
+      Member member = new Member();
+      member.setName(name);
+      member.setEmail(email);
+      member.setPhoneNumber(phone);
+      member.setAddress(address);
+      return createNewMember(member);
+   }
 
-       return createNewMember(member);
-    }
+   /**
+    * Creates a new member from the instance provided.  Performs validation, and will return a JAX-RS response with either
+    * 200 ok, or with a map of fields, and related errors.
+    */
+   private Response createNewMember(Member member) {
+      Response.ResponseBuilder builder;
+      try {
+         //Validates member using bean validation
+         validateNewMember(member);
 
-    /**
-     * Creates a new member from the instance provided.  Performs validation, and will return a JAX-RS response with either
-     * 200 ok, or with a map of fields, and related errors.
-     */
-    private Response createNewMember(Member member) {
-        Response.ResponseBuilder builder;
-        try {
-           //Validates member using bean validation
-           validateNewMember(member);
+         //Register the member
+         log.info("Registering " + member.getName());
+         em.persist(member);
 
-           //Register the member
-           log.info("Registering " + member.getName());
-           em.persist(member);
+         //Trigger the creation event
+         memberEventSrc.fire(member);
 
-           //Trigger the creation event
-           memberEventSrc.fire(member);
+         //Create an "ok" response
+         builder = Response.ok();
+      } catch (ConstraintViolationException ce) {
+         //Handle bean validation issues
+         builder = createViolationResponse(ce.getConstraintViolations());
+      } catch (ValidationException e) {
+         //Handle the unique constrain violation
+         Map<String, String> responseObj = new HashMap<String, String>();
+         responseObj.put("email", "Email taken");
+         builder = Response.status(Response.Status.CONFLICT).entity(responseObj);
+      }
+      return builder.build();
+   }
 
-           //Create an "ok" response
-           builder = Response.ok();
-        } catch (ConstraintViolationException ce) {
-           //Handle bean validation issues
-           builder = createViolationResponse(ce.getConstraintViolations());
-        } catch (ValidationException e) {
-           //Handle the unique constrain violation
-           Map<String, String> responseObj = new HashMap<String, String>();
-           responseObj.put("email","Email taken");
-           builder = Response.status(Response.Status.CONFLICT).entity(responseObj);
-        }
-        return builder.build();
-    }
+   private Response updateMember(Member member) {
+      Set<ConstraintViolation<?>> constraintViolations = new HashSet<ConstraintViolation<?>>(validator.validate(member));
+      if (!constraintViolations.isEmpty()) {
+         return createViolationResponse(constraintViolations).build();
+      }
+      // look up that the instance exists, so we can return the appropriate error code if it doesn't
+      Member existingInstance = getMemberById(member.getId());
+      if (existingInstance == null) {
+         return Response.status(Response.Status.NOT_FOUND).build();
+      }
+      em.merge(member);
+      return Response.ok().build();
+   }
 
-    private Response updateMember(Member member) {
-        Set<ConstraintViolation<?>> constraintViolations = (Set<ConstraintViolation<?>>) validator.validate(member);
-        if (!constraintViolations.isEmpty()) {
-            return createViolationResponse(constraintViolations).build();
-        }
-        // look up that the instance exists, so we can return the appropriate error code if it doesn't
-        Member existingInstance = em.find(Member.class, member.getId());
-        if (existingInstance == null) {
-            return Response.status(Response.Status.NOT_FOUND).build();
-        }
-        em.merge(member);
-        return Response.ok().build();
-    }
-
-    /**
+   /**
     * <p>Validates the given Member variable and throws validation exceptions based on the type of error.
     * If the error is standard bean validation errors then it will throw a ConstraintValidationException
     * with the set of the constraints violated.</p>
     * <p>If the error is caused because an existing member with the same email is registered it throws a regular
     * validation exception so that it can be interpreted separately.</p>
+    *
     * @param member Member to be validated
     * @throws ConstraintViolationException If Bean Validation errors exist
-    * @throws ValidationException If member with the same email already exists
+    * @throws ValidationException          If member with the same email already exists
     */
-   private void validateNewMember(Member member) throws ConstraintViolationException, ValidationException{
+   private void validateNewMember(Member member) throws ConstraintViolationException, ValidationException {
       //Create a bean validator and check for issues.
       Set<ConstraintViolation<Member>> violations = validator.validate(member);
 

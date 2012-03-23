@@ -23,6 +23,7 @@
 		<td><%=member.name%></td>
 		<td><%=member.email%></td>
 		<td><%=member.phoneNumber%></td>
+		<td><%=member.address.country%></td>
 		<td><a href="rest/members/<%=member.id%>" target="_blank" class="resturl">XML</a> / <a href="rest/members/<%=member.id%>/json" target="_blank" class="resturl">JSON</a></td>
 	</tr>
 <% }); %>

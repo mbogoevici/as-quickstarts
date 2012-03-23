@@ -10,6 +10,7 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
 import javax.persistence.Table;
 import javax.persistence.UniqueConstraint;
+import javax.validation.Valid;
 import javax.validation.constraints.Digits;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Pattern;
@@ -95,6 +96,8 @@ public class Member implements Serializable {
     // We do want JAXB to map this as an element, not an attribute, so we omit @XmlAttribute to get
     // the default behavior
     @NotNull
+    // Tell Bean Validator to cascade validation
+    @Valid
     private Address address = new Address();
 
     // What follows is fairly boring boilerplate code, along with generated equals and hashcode

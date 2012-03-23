@@ -1,0 +1,13 @@
+<component name="ArtifactManager">
+  <artifact type="exploded-war" name="jboss-as-kitchensink-html5-mobile:war exploded">
+    <output-path>$PROJECT_DIR$/target/jboss-as-kitchensink-html5-mobile</output-path>
+    <root id="root">
+      <element id="javaee-facet-resources" facet="jboss-as-kitchensink-html5-mobile/web/Web" />
+      <element id="directory" name="WEB-INF">
+        <element id="directory" name="classes">
+          <element id="module-output" name="jboss-as-kitchensink-html5-mobile" />
+        </element>
+      </element>
+    </root>
+  </artifact>
+</component>

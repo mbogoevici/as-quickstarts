@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="war" name="jboss-as-kitchensink-html5-mobile:war">
+    <output-path>$PROJECT_DIR$/target</output-path>
+    <root id="archive" name="jboss-as-kitchensink-html5-mobile.war">
+      <element id="artifact" artifact-name="jboss-as-kitchensink-html5-mobile:war exploded" />
+    </root>
+  </artifact>
+</component>
